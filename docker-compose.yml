@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # The Database for your AI-Router-Engine project
+  db:
+    image: postgres:15-alpine
+    container_name: router_postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: ai_router_db
+    ports:
+      - "5433:5432"  # Note: Using 5433 so it doesn't clash with your local Postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # The Redis Cache for lightning-fast routing
+  redis:
+    image: redis:7-alpine
+    container_name: router_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
