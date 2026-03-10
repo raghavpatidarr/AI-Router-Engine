@@ -33,3 +33,22 @@ def create_ai_model(model: schemas.ModelCreate, db: Session = Depends(get_db)):
 @app.get("/models/", response_model=list[schemas.ModelResponse])
 def get_all_models(db: Session = Depends(get_db)):
     return db.query(models.AIModel).all()
+
+# 3. The Core Router Engine
+@app.post("/route/", response_model=schemas.RouterResponse)
+def route_prompt(request: schemas.PromptRequest, db: Session = Depends(get_db)):
+    
+    # Step A: Ask the database to find ALL models, sort them by price (lowest to highest), and grab the first one
+    cheapest_model = db.query(models.AIModel).order_by(models.AIModel.cost_per_1k_tokens.asc()).first()
+    
+    # Step B: Safety check (what if the database is empty?)
+    if not cheapest_model:
+        return {"error": "No AI models found in the database. Please add some first!"}
+    
+    # Step C: Return the final routing decision
+    return {
+        "selected_model": cheapest_model.name,
+        "provider": cheapest_model.provider,
+        "cost": cheapest_model.cost_per_1k_tokens,
+        "message": f"Successfully routed to {cheapest_model.name} because it is the most cost-effective option."
+    }

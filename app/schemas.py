@@ -16,3 +16,13 @@ class ModelResponse(ModelBase):
 
     class Config:
         from_attributes = True
+# Schema for receiving a user's prompt
+class PromptRequest(BaseModel):
+    user_prompt: str
+
+# Schema for the router's final decision
+class RouterResponse(BaseModel):
+    selected_model: str
+    provider: str
+    cost: float
+    message: str
