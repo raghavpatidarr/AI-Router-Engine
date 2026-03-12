@@ -5,6 +5,7 @@ class AIModel(Base):
     __tablename__ = "ai_models"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)  # e.g., "gpt-4o" or "claude-3"
-    provider = Column(String)                      # e.g., "OpenAI" or "Anthropic"
-    cost_per_1k_tokens = Column(Float)             # The price to help the router decide
+    name = Column(String, index=True)
+    provider = Column(String)
+    cost_per_1k_tokens = Column(Float)
+    specialty = Column(String, default="general")  # <--- NEW COLUMN!

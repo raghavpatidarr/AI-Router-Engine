@@ -54,6 +54,7 @@ def update_ai_model(model_id: int, updated_model: schemas.ModelCreate, db: Sessi
     db_model.name = updated_model.name
     db_model.provider = updated_model.provider
     db_model.cost_per_1k_tokens = updated_model.cost_per_1k_tokens
+    db_model.specialty = updated_model.specialty  # <--- Added this to update specialty!
     
     db.commit()
     db.refresh(db_model)
@@ -73,32 +74,67 @@ def delete_ai_model(model_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Successfully deleted model ID {model_id}"}
 
-# --- THE UPGRADED ROUTER ---
+
+# --- THE AI ROUTER ENGINE ---
+
 @app.post("/route/", response_model=schemas.RouterResponse)
 def route_prompt(request: schemas.PromptRequest, db: Session = Depends(get_db)):
     
-    # 1. Find the cheapest model in the PostgreSQL database
-    cheapest_model = db.query(models.AIModel).order_by(models.AIModel.cost_per_1k_tokens.asc()).first()
+    prompt = request.user_prompt.lower()
+    total_marks = 0
+    detected_specialty = "general" # Default fallback
     
-    if not cheapest_model:
-        return {"error": "No AI models found in the database. Please add some first!"}
+    # --- 1. THE EVALUATION ENGINE ---
+ # --- 1. THE EVALUATION ENGINE ---
     
-    # 2. If the cheapest model is from Groq, actually send the prompt to the AI!
-    if cheapest_model.provider.lower() == "groq":
+    # Split the prompt into a list of individual words so "fast" doesn't match "fastapi"
+    words = prompt.replace(".", "").replace(",", "").split()
+    
+    tech_keywords = ["code", "python", "fastapi", "sql", "database", "docker", "react", "script"]
+    if any(kw in words for kw in tech_keywords):  # <--- Changed prompt to words
+        total_marks += 4  
+        detected_specialty = "coding" 
+        
+    reasoning_keywords = ["explain", "analyze", "debug", "calculate", "logic", "compare", "why"]
+    if any(kw in words for kw in reasoning_keywords): # <--- Changed prompt to words
+        total_marks += 3
+        if detected_specialty != "coding": 
+            detected_specialty = "reasoning"
+            
+    speed_keywords = ["fast", "quick", "urgent", "short", "tl;dr", "brief"]
+    if any(kw in words for kw in speed_keywords): # <--- Changed prompt to words
+        total_marks -= 3 
+        # Only override to general if it wasn't already marked as a coding or reasoning task
+        if detected_specialty not in ["coding", "reasoning"]:
+            detected_specialty = "general"
+        
+    # --- 2. SPECIALTY ROUTING ---
+    # Find the model that perfectly matches our detected specialty
+    selected_model = db.query(models.AIModel).filter(models.AIModel.specialty == detected_specialty).first()
+
+    # Safety fallback if the database is empty
+    if not selected_model:
+        # Fallback to just grabbing any model if the specific specialty isn't found
+        selected_model = db.query(models.AIModel).first()
+        if not selected_model:
+             return {"error": "No AI models found in the database."}
+    
+    reason = f"Routed to '{detected_specialty}' model. (Score: {total_marks})"
+
+    # --- 3. THE API CONNECTION ---
+    if selected_model.provider.lower() == "groq":
         chat_completion = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": request.user_prompt}],
-            model=cheapest_model.name,
+            model=selected_model.name,
         )
-        # Extract the actual text response from the AI
         ai_response = chat_completion.choices[0].message.content
     else:
-        # Fallback if it's not Groq
-        ai_response = f"Simulation: I would route this to {cheapest_model.name}, but I only have keys for Groq right now!"
+        ai_response = f"Simulation: Sent to {selected_model.name}."
 
-    # 3. Return the final data and the AI's actual answer
     return {
-        "selected_model": cheapest_model.name,
-        "provider": cheapest_model.provider,
-        "cost": cheapest_model.cost_per_1k_tokens,
-        "message": ai_response
+        "selected_model": selected_model.name,
+        "provider": selected_model.provider,
+        "cost": selected_model.cost_per_1k_tokens,
+        "specialty": selected_model.specialty,
+        "message": f"[{reason}]\n\n{ai_response}"
     }
