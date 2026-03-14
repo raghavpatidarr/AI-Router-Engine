@@ -1,4 +1,13 @@
+# Environments
 venv/
+env/
+
+# Secret Keys
 .env
+
+# Cache
 __pycache__/
 *.pyc
+
+# Mac system files
+.DS_Store
