@@ -1,25 +1,37 @@
 version: '3.8'
 
 services:
-  # The Database for your AI-Router-Engine project
+  # 1. The Database
   db:
-    image: postgres:15-alpine
-    container_name: router_postgres
+    image: postgres:15
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: rootpassword
-      POSTGRES_DB: ai_router_db
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: router_db
     ports:
-      - "5433:5432"  # Note: Using 5433 so it doesn't clash with your local Postgres
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # The Redis Cache for lightning-fast routing
-  redis:
-    image: redis:7-alpine
-    container_name: router_redis
+  # 2. The FastAPI Backend
+  backend:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "6379:6379"
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  # 3. The Streamlit Frontend
+  frontend:
+    build: .
+    command: streamlit run frontend.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

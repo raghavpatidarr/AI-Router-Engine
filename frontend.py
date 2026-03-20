@@ -28,7 +28,7 @@ with chat_tab:
         with st.spinner("🧠 Semantic Brain is analyzing and routing..."):
             try:
                 response = requests.post(
-                    "http://127.0.0.1:8000/route/",
+                    "http://backend:8000/route/",
                     json={"user_prompt": prompt}
                 )
                 
@@ -62,12 +62,12 @@ with admin_tab:
     
     # 1. READ: Fetch and display all models
     try:
-        res = requests.get("http://127.0.0.1:8000/models/")
+        res = requests.get("http://backend:8000/models/")
         if res.status_code == 200:
             models = res.json()
             if models:
                 # Streamlit automatically turns lists of dictionaries into beautiful tables!
-                st.dataframe(models, use_container_width=True)
+                st.dataframe(models, width="stretch")
             else:
                 st.info("No models found in the database.")
     except:
@@ -93,7 +93,7 @@ with admin_tab:
                 "cost_per_1k_tokens": new_cost,
                 "specialty": new_specialty
             }
-            requests.post("http://127.0.0.1:8000/models/", json=new_data)
+            requests.post("http://backend:8000/models/", json=new_data)
             st.rerun() # Instantly refreshes the page to show the new table!
 
     st.divider()
@@ -105,5 +105,36 @@ with admin_tab:
         submit_del = st.form_submit_button("🗑️ Delete Model")
         
         if submit_del:
-            requests.delete(f"http://127.0.0.1:8000/models/{del_id}")
+            requests.delete(f"http://backend:8000/models/{del_id}")
             st.rerun()
+    
+    st.divider()
+
+    # 4. UPDATE: Form to modify an existing model
+    st.subheader("Update Existing Model")
+    with st.form("update_model_form", clear_on_submit=True):
+        st.markdown("Enter the ID of the model you want to change, then fill in the new details.")
+        update_id = st.number_input("Model ID to Update", min_value=1, step=1)
+        
+        col3, col4 = st.columns(2)
+        up_name = col3.text_input("New Model Name")
+        up_provider = col4.text_input("New Provider")
+        up_cost = col3.number_input("New Cost per 1k", min_value=0.0, format="%.4f")
+        up_specialty = col4.selectbox("New Specialty", ["general", "coding", "reasoning"])
+        
+        submit_update = st.form_submit_button("✏️ Update Model")
+        
+        if submit_update and up_name and up_provider:
+            update_data = {
+                "name": up_name,
+                "provider": up_provider,
+                "cost_per_1k_tokens": up_cost,
+                "specialty": up_specialty
+            }
+            # Hit the PUT door we built in FastAPI!
+            res = requests.put(f"http://backend:8000/models/{update_id}", json=update_data)
+            if res.status_code == 200:
+                st.success("Model updated successfully!")
+                st.rerun()
+            else:
+                st.error("Model ID not found.")
